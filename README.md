@@ -12,7 +12,7 @@ contexto completo de negócio e arquitetura.
 - Next.js (App Router), deploy na Vercel
 - Supabase (banco compartilhado com `agente-chapelao` e o ERP)
 - Evolution API (WhatsApp)
-- Claude API (geração de mensagem)
+- OpenAI API (geração de mensagem, gpt-4o)
 - ElevenLabs (opcional — áudio)
 
 ## Rodando localmente

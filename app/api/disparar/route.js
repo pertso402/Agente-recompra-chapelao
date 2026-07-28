@@ -6,7 +6,7 @@ import {
   diasSemComprar,
 } from '../../../lib/supabase';
 import { enviarMidia, enviarTexto, enviarAudio } from '../../../lib/evolution';
-import { gerarMensagemRecompra } from '../../../lib/claude';
+import { gerarMensagemRecompra } from '../../../lib/openai';
 import { gerarAudioBase64 } from '../../../lib/elevenlabs';
 
 export async function POST(request) {
