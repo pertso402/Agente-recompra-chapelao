@@ -5,20 +5,25 @@ const supabase = createClient(process.env.SUPA_URL, process.env.SUPA_SERVICE_KEY
 
 async function main() {
   const telefone = process.argv[2];
+  const nome = process.argv[3] || 'Cliente Demo';
   if (!telefone) {
-    console.error('Uso: node scripts/seed-demo.js 5544999999999');
+    console.error('Uso: node scripts/seed-demo.js 5544999999999 "Nome do Cliente"');
     process.exit(1);
   }
 
   const { data: produto } = await supabase
     .from('produtos')
     .select('id, nome, categoria, preco')
-    .ilike('categoria', '%pizza%')
+    .or('video_url.not.is.null,imagem_url.not.is.null')
     .eq('disponivel', true)
     .limit(1)
     .maybeSingle();
 
-  const produtoDemo = produto || { id: null, nome: 'Marmita Especial', preco: 25 };
+  if (!produto) {
+    console.error('Nenhum produto com imagem/vídeo cadastrado — não dá pra testar a mídia.');
+    process.exit(1);
+  }
+  const produtoDemo = produto;
 
   const doze_dias_atras = new Date(Date.now() - 12 * 86400000).toISOString();
 
@@ -26,7 +31,7 @@ async function main() {
     .from('clientes')
     .upsert(
       {
-        nome: 'Demo Prospecção',
+        nome,
         telefone,
         total_pedidos: 3,
         total_gasto: produtoDemo.preco * 3,
