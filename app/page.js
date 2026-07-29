@@ -171,7 +171,8 @@ export default function Painel() {
         {demoAberto && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
             <input
-              placeholder="Telefone (5544999999999)"
+              placeholder="Telefone com DDD (44 99708-8509)"
+              inputMode="tel"
               value={demo.telefone}
               onChange={(e) => setDemo({ ...demo, telefone: e.target.value })}
               style={{ padding: 8, borderRadius: 8, border: '1px solid #d4d4d8', fontSize: 13 }}

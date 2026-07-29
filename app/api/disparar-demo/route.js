@@ -1,5 +1,5 @@
 import { buscarOuCriarClienteDemo, criarCupom, registrarOfertaEnviada } from '../../../lib/supabase';
-import { enviarMidia, enviarTexto, enviarAudio } from '../../../lib/evolution';
+import { enviarMidia, enviarTexto, enviarAudio, verificarNumeroWhatsapp } from '../../../lib/evolution';
 import { gerarMensagemRecompra } from '../../../lib/openai';
 import { gerarAudioBase64 } from '../../../lib/elevenlabs';
 
@@ -19,7 +19,18 @@ export async function POST(request) {
       return Response.json({ error: 'telefone e nomeProduto são obrigatórios' }, { status: 400 });
     }
 
-    const cliente = await buscarOuCriarClienteDemo({ nome, telefone });
+    // Valida o número antes de gastar API paga (OpenAI/ElevenLabs) e antes de
+    // criar cupom — senão um número digitado errado deixa cupom órfão no banco
+    // e só falha depois de todo o trabalho feito.
+    const check = await verificarNumeroWhatsapp(telefone);
+    if (!check.existe) {
+      return Response.json(
+        { error: `O número ${check.numero || telefone} não existe no WhatsApp. Confira o DDD e o número (não precisa digitar o 55).` },
+        { status: 400 }
+      );
+    }
+
+    const cliente = await buscarOuCriarClienteDemo({ nome, telefone: check.numero });
     const cupom = await criarCupom({ clienteId: cliente.id, descontoPercentual });
 
     // A copy usa o nome digitado no formulário, não o do registro no banco:

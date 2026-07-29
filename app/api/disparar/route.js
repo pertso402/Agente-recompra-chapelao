@@ -5,7 +5,7 @@ import {
   registrarOfertaEnviada,
   diasSemComprar,
 } from '../../../lib/supabase';
-import { enviarMidia, enviarTexto, enviarAudio } from '../../../lib/evolution';
+import { enviarMidia, enviarTexto, enviarAudio, verificarNumeroWhatsapp } from '../../../lib/evolution';
 import { gerarMensagemRecompra } from '../../../lib/openai';
 import { gerarAudioBase64 } from '../../../lib/elevenlabs';
 
@@ -24,6 +24,17 @@ export async function POST(request) {
     const ultimo = await buscarUltimoPedidoComItens(clienteId);
     if (!ultimo) {
       return Response.json({ error: 'Cliente não tem pedidos anteriores' }, { status: 400 });
+    }
+
+    // Valida o WhatsApp antes de criar cupom e gastar OpenAI/ElevenLabs —
+    // número inativo deixaria cupom órfão no banco e a oferta contabilizada
+    // como enviada sem nunca ter chegado no cliente.
+    const check = await verificarNumeroWhatsapp(cliente.telefone);
+    if (!check.existe) {
+      return Response.json(
+        { error: `O WhatsApp ${check.numero || cliente.telefone} não está ativo. Confira o cadastro do cliente.` },
+        { status: 400 }
+      );
     }
 
     const dias = diasSemComprar(cliente.ultimo_pedido);
