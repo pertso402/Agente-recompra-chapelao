@@ -29,7 +29,7 @@ export async function POST(request) {
     const dias = diasSemComprar(cliente.ultimo_pedido);
     const cupom = await criarCupom({ clienteId, descontoPercentual });
 
-    const texto = await gerarMensagemRecompra({
+    const { audio: textoAudio, cta: textoCta } = await gerarMensagemRecompra({
       cliente,
       ultimoPedido: ultimo.pedido,
       itens: ultimo.itens,
@@ -42,14 +42,14 @@ export async function POST(request) {
       await enviarMidia(cliente.telefone, {
         url: midiaUrl,
         tipo: ultimo.produtoDestaque?.video_url ? 'video' : 'image',
-        legenda: texto,
+        legenda: textoCta,
       });
     } else {
-      await enviarTexto(cliente.telefone, texto);
+      await enviarTexto(cliente.telefone, textoCta);
     }
 
     let audioEnviado = false;
-    const audioBase64 = await gerarAudioBase64(texto);
+    const audioBase64 = await gerarAudioBase64(textoAudio);
     if (audioBase64) {
       await enviarAudio(cliente.telefone, audioBase64);
       audioEnviado = true;
@@ -63,11 +63,11 @@ export async function POST(request) {
       cupomId: cupom.id,
       cupomCodigo: cupom.codigo,
       mensagemVideo: midiaUrl,
-      mensagemAudio: audioEnviado ? 'enviado' : null,
-      mensagemCta: texto,
+      mensagemAudio: audioEnviado ? textoAudio : null,
+      mensagemCta: textoCta,
     });
 
-    return Response.json({ sucesso: true, oferta, cupom, mensagem: texto });
+    return Response.json({ sucesso: true, oferta, cupom, mensagemCta: textoCta, mensagemAudio: textoAudio });
   } catch (err) {
     console.error('Erro ao disparar recompra:', err);
     return Response.json({ error: err.message || 'Erro interno' }, { status: 500 });
