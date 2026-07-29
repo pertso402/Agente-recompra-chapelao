@@ -37,6 +37,13 @@ export async function POST(request) {
       cupom,
     });
 
+    let audioEnviado = false;
+    const audioBase64 = await gerarAudioBase64(textoAudio);
+    if (audioBase64) {
+      await enviarAudio(cliente.telefone, audioBase64);
+      audioEnviado = true;
+    }
+
     const midiaUrl = ultimo.produtoDestaque?.video_url || ultimo.produtoDestaque?.imagem_url || null;
     if (midiaUrl) {
       await enviarMidia(cliente.telefone, {
@@ -46,13 +53,6 @@ export async function POST(request) {
       });
     } else {
       await enviarTexto(cliente.telefone, textoCta);
-    }
-
-    let audioEnviado = false;
-    const audioBase64 = await gerarAudioBase64(textoAudio);
-    if (audioBase64) {
-      await enviarAudio(cliente.telefone, audioBase64);
-      audioEnviado = true;
     }
 
     const oferta = await registrarOfertaEnviada({

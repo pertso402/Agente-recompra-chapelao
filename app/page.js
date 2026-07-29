@@ -30,12 +30,29 @@ function Badge({ status }) {
   );
 }
 
+const NICHOS = {
+  marmitaria: { label: 'Marmitaria', produtoExemplo: 'Marmitex de Frango' },
+  pizzaria: { label: 'Pizzaria', produtoExemplo: 'Pizza de Calabresa' },
+  hamburgueria: { label: 'Hamburgueria', produtoExemplo: 'X-Bacon Artesanal' },
+};
+
 export default function Painel() {
   const [clientes, setClientes] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [disparando, setDisparando] = useState(null);
   const [feedback, setFeedback] = useState(null);
   const [diasMinimo, setDiasMinimo] = useState(7);
+
+  const [demoAberto, setDemoAberto] = useState(false);
+  const [demoEnviando, setDemoEnviando] = useState(false);
+  const [demo, setDemo] = useState({
+    telefone: '',
+    nome: '',
+    nicho: 'pizzaria',
+    nomeProduto: '',
+    mediaUrl: '',
+    tipoMidia: 'video',
+  });
 
   async function carregar() {
     setCarregando(true);
@@ -71,6 +88,29 @@ export default function Painel() {
       setFeedback({ tipo: 'erro', texto: e.message || 'Erro ao disparar' });
     } finally {
       setDisparando(null);
+    }
+  }
+
+  async function dispararDemo() {
+    if (!demo.telefone || !demo.nomeProduto) {
+      setFeedback({ tipo: 'erro', texto: 'Preencha ao menos telefone e nome do produto' });
+      return;
+    }
+    setDemoEnviando(true);
+    setFeedback(null);
+    try {
+      const res = await fetch('/api/disparar-demo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(demo),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setFeedback({ tipo: 'ok', texto: `Demo enviada! Cupom: ${data.cupom.codigo}` });
+    } catch (e) {
+      setFeedback({ tipo: 'erro', texto: e.message || 'Erro ao disparar demo' });
+    } finally {
+      setDemoEnviando(false);
     }
   }
 
@@ -119,6 +159,77 @@ export default function Painel() {
           {feedback.texto}
         </div>
       )}
+
+      <div style={{ background: '#fff', borderRadius: 14, padding: 14, marginBottom: 16, boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+        <button
+          onClick={() => setDemoAberto((v) => !v)}
+          style={{ background: 'none', border: 'none', padding: 0, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
+        >
+          {demoAberto ? '▾' : '▸'} 🎯 Demo por nicho (prospecção)
+        </button>
+
+        {demoAberto && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
+            <input
+              placeholder="Telefone (5544999999999)"
+              value={demo.telefone}
+              onChange={(e) => setDemo({ ...demo, telefone: e.target.value })}
+              style={{ padding: 8, borderRadius: 8, border: '1px solid #d4d4d8', fontSize: 13 }}
+            />
+            <input
+              placeholder="Nome do prospect/cliente"
+              value={demo.nome}
+              onChange={(e) => setDemo({ ...demo, nome: e.target.value })}
+              style={{ padding: 8, borderRadius: 8, border: '1px solid #d4d4d8', fontSize: 13 }}
+            />
+            <select
+              value={demo.nicho}
+              onChange={(e) => setDemo({ ...demo, nicho: e.target.value, nomeProduto: NICHOS[e.target.value].produtoExemplo })}
+              style={{ padding: 8, borderRadius: 8, border: '1px solid #d4d4d8', fontSize: 13 }}
+            >
+              {Object.entries(NICHOS).map(([key, v]) => (
+                <option key={key} value={key}>{v.label}</option>
+              ))}
+            </select>
+            <input
+              placeholder="Nome do produto (ex: Pizza de Calabresa)"
+              value={demo.nomeProduto}
+              onChange={(e) => setDemo({ ...demo, nomeProduto: e.target.value })}
+              style={{ padding: 8, borderRadius: 8, border: '1px solid #d4d4d8', fontSize: 13 }}
+            />
+            <input
+              placeholder="URL da mídia (vídeo ou imagem)"
+              value={demo.mediaUrl}
+              onChange={(e) => setDemo({ ...demo, mediaUrl: e.target.value })}
+              style={{ padding: 8, borderRadius: 8, border: '1px solid #d4d4d8', fontSize: 13 }}
+            />
+            <select
+              value={demo.tipoMidia}
+              onChange={(e) => setDemo({ ...demo, tipoMidia: e.target.value })}
+              style={{ padding: 8, borderRadius: 8, border: '1px solid #d4d4d8', fontSize: 13 }}
+            >
+              <option value="video">Vídeo</option>
+              <option value="image">Imagem</option>
+            </select>
+            <button
+              onClick={dispararDemo}
+              disabled={demoEnviando}
+              style={{
+                padding: '10px 12px',
+                borderRadius: 10,
+                border: 'none',
+                background: '#18181b',
+                color: '#fff',
+                fontWeight: 600,
+                fontSize: 13,
+                opacity: demoEnviando ? 0.6 : 1,
+              }}
+            >
+              {demoEnviando ? 'Enviando...' : '🚀 Disparar demo'}
+            </button>
+          </div>
+        )}
+      </div>
 
       {carregando && <p style={{ color: '#71717a', fontSize: 14 }}>Carregando...</p>}
 

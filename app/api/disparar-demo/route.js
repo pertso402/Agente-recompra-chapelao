@@ -1,0 +1,63 @@
+import { buscarOuCriarClienteDemo, criarCupom, registrarOfertaEnviada } from '../../../lib/supabase';
+import { enviarMidia, enviarTexto, enviarAudio } from '../../../lib/evolution';
+import { gerarMensagemRecompra } from '../../../lib/openai';
+import { gerarAudioBase64 } from '../../../lib/elevenlabs';
+
+export async function POST(request) {
+  try {
+    const {
+      telefone,
+      nome = 'Cliente Demo',
+      nicho = 'marmitaria',
+      nomeProduto,
+      mediaUrl,
+      tipoMidia = 'video',
+      descontoPercentual = 15,
+    } = await request.json();
+
+    if (!telefone || !nomeProduto) {
+      return Response.json({ error: 'telefone e nomeProduto são obrigatórios' }, { status: 400 });
+    }
+
+    const cliente = await buscarOuCriarClienteDemo({ nome, telefone });
+    const cupom = await criarCupom({ clienteId: cliente.id, descontoPercentual });
+
+    const { audio: textoAudio, cta: textoCta } = await gerarMensagemRecompra({
+      cliente,
+      itens: [{ quantidade: 1, nome_produto: nomeProduto }],
+      diasSemComprar: 12,
+      cupom,
+      nicho,
+    });
+
+    let audioEnviado = false;
+    const audioBase64 = await gerarAudioBase64(textoAudio);
+    if (audioBase64) {
+      await enviarAudio(telefone, audioBase64);
+      audioEnviado = true;
+    }
+
+    if (mediaUrl) {
+      await enviarMidia(telefone, { url: mediaUrl, tipo: tipoMidia, legenda: textoCta });
+    } else {
+      await enviarTexto(telefone, textoCta);
+    }
+
+    const oferta = await registrarOfertaEnviada({
+      clienteId: cliente.id,
+      diasSemComprar: 12,
+      tipoOferta: 'reconexao',
+      descontoPercentual,
+      cupomId: cupom.id,
+      cupomCodigo: cupom.codigo,
+      mensagemVideo: mediaUrl || null,
+      mensagemAudio: audioEnviado ? textoAudio : null,
+      mensagemCta: textoCta,
+    });
+
+    return Response.json({ sucesso: true, oferta, cupom, mensagemCta: textoCta, mensagemAudio: textoAudio });
+  } catch (err) {
+    console.error('Erro ao disparar demo:', err);
+    return Response.json({ error: err.message || 'Erro interno' }, { status: 500 });
+  }
+}
