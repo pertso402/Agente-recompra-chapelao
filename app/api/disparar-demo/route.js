@@ -22,8 +22,12 @@ export async function POST(request) {
     const cliente = await buscarOuCriarClienteDemo({ nome, telefone });
     const cupom = await criarCupom({ clienteId: cliente.id, descontoPercentual });
 
+    // A copy usa o nome digitado no formulário, não o do registro no banco:
+    // se o telefone já existe como cliente, buscarOuCriarClienteDemo devolve
+    // o cadastro antigo (e não sobrescreve o nome real de propósito) — sem
+    // isso a demo falava o nome do cliente antigo em vez do prospect.
     const { audio: textoAudio, cta: textoCta } = await gerarMensagemRecompra({
-      cliente,
+      cliente: { ...cliente, nome },
       itens: [{ quantidade: 1, nome_produto: nomeProduto }],
       diasSemComprar: 12,
       cupom,
