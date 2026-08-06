@@ -16,7 +16,14 @@ import { deveDispararAgora, agoraNoFuso, META_DIARIA } from '../../../lib/campan
 // frequência do cron, não de lote.
 export const maxDuration = 60;
 
-const BRINDE = '1 refrigerante lata + 1 sobremesa';
+// Texto que o cliente ouve. O volume da sobremesa fica de fora de propósito:
+// "75ml" soa pequeno e tira o apelo do brinde.
+const BRINDE = '1 coquinha mini de 200ml (ou outro refrigerante mini) + 1 sobremesa';
+
+// Nomes EXATOS do cardápio que podem sair como cortesia. É esta lista, e não
+// o texto acima, que o atendimento usa pra decidir o que entregar — sem ela
+// um pedido de "refrigerante" casaria com a Coca de 2L.
+const BRINDE_ITENS_PERMITIDOS = ['Refrigerante 200ml Pet', 'Sobremesa 75ml'];
 const CANDIDATOS_POR_TICK = 8;
 
 // Falha fechado de propósito: esta rota está fora da senha do painel (o
@@ -115,6 +122,7 @@ async function executar(request) {
       tipo: 'brinde',
       descontoPercentual: 0,
       descricao: BRINDE,
+      itensPermitidos: BRINDE_ITENS_PERMITIDOS,
       validoAteDias: 7,
     });
 
