@@ -17,6 +17,9 @@ export function middleware(request) {
   });
 }
 
+// /api/campanha fica fora da senha do painel porque quem chama é o agendador
+// (pg_cron do Supabase), que não tem como fazer login de navegador. Essa rota
+// se protege sozinha com CRON_SECRET, exigido de forma estrita lá.
 export const config = {
-  matcher: '/((?!_next/static|_next/image|favicon.ico).*)',
+  matcher: '/((?!_next/static|_next/image|favicon.ico|api/campanha).*)',
 };

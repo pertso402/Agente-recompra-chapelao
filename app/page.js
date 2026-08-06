@@ -43,6 +43,9 @@ export default function Painel() {
   const [feedback, setFeedback] = useState(null);
   const [diasMinimo, setDiasMinimo] = useState(7);
 
+  const [midia, setMidia] = useState(null);
+  const [subindo, setSubindo] = useState(false);
+
   const [demoAberto, setDemoAberto] = useState(false);
   const [demoEnviando, setDemoEnviando] = useState(false);
   const [demo, setDemo] = useState({
@@ -67,9 +70,42 @@ export default function Painel() {
     }
   }
 
+  async function carregarMidia() {
+    try {
+      const res = await fetch('/api/buffet');
+      const data = await res.json();
+      setMidia(data.midia || null);
+    } catch (e) {
+      /* status da mídia é informativo — não bloqueia o resto do painel */
+    }
+  }
+
   useEffect(() => {
     carregar();
   }, [diasMinimo]);
+
+  useEffect(() => {
+    carregarMidia();
+  }, []);
+
+  async function subirBuffet(arquivo) {
+    if (!arquivo) return;
+    setSubindo(true);
+    setFeedback(null);
+    try {
+      const body = new FormData();
+      body.append('arquivo', arquivo);
+      const res = await fetch('/api/buffet', { method: 'POST', body });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setMidia(data.midia);
+      setFeedback({ tipo: 'ok', texto: 'Vídeo do buffet de hoje enviado! A campanha já pode rodar.' });
+    } catch (e) {
+      setFeedback({ tipo: 'erro', texto: e.message || 'Erro ao subir o vídeo' });
+    } finally {
+      setSubindo(false);
+    }
+  }
 
   async function disparar(clienteId) {
     setDisparando(clienteId);
@@ -159,6 +195,57 @@ export default function Painel() {
           {feedback.texto}
         </div>
       )}
+
+      <div
+        style={{
+          background: '#fff',
+          borderRadius: 14,
+          padding: 14,
+          marginBottom: 12,
+          boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+          borderLeft: `4px solid ${midia ? '#16a34a' : '#dc2626'}`,
+        }}
+      >
+        <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>🍽️ Buffet de hoje</div>
+        <div style={{ fontSize: 12, color: midia ? '#166534' : '#991b1b', marginBottom: 10 }}>
+          {midia
+            ? 'Vídeo enviado — a campanha das 11h às 14h vai usar ele.'
+            : 'Nenhum vídeo hoje. Sem ele a campanha não dispara.'}
+        </div>
+
+        {midia && (
+          <video
+            src={midia.video_url}
+            controls
+            playsInline
+            style={{ width: '100%', borderRadius: 10, marginBottom: 10, background: '#000' }}
+          />
+        )}
+
+        <label
+          style={{
+            display: 'block',
+            padding: '10px 12px',
+            borderRadius: 10,
+            background: subindo ? '#a1a1aa' : '#18181b',
+            color: '#fff',
+            fontWeight: 600,
+            fontSize: 13,
+            textAlign: 'center',
+            cursor: subindo ? 'default' : 'pointer',
+          }}
+        >
+          {subindo ? 'Enviando...' : midia ? '🔄 Trocar vídeo de hoje' : '📹 Enviar vídeo do buffet'}
+          <input
+            type="file"
+            accept="video/*,image/*"
+            capture="environment"
+            disabled={subindo}
+            onChange={(e) => subirBuffet(e.target.files?.[0])}
+            style={{ display: 'none' }}
+          />
+        </label>
+      </div>
 
       <div style={{ background: '#fff', borderRadius: 14, padding: 14, marginBottom: 16, boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
         <button
