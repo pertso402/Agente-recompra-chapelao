@@ -77,7 +77,10 @@ export async function POST(request) {
       return Response.json({ enviado: false, motivo: 'status_sem_mensagem' });
     }
 
-    await enviarTexto(telefone, texto);
+    // 'principal': sai do WhatsApp do atendimento (mesmo número onde o
+    // cliente já está conversando sobre o pedido), não do número de disparo
+    // da recompra — decisão explícita, não confundir com o padrão da lib.
+    await enviarTexto(telefone, texto, 'principal');
 
     return Response.json({ enviado: true, numeroPedido: pedido.numero_pedido, status });
   } catch (err) {
