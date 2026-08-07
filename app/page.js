@@ -46,6 +46,11 @@ export default function Painel() {
   const [midia, setMidia] = useState(null);
   const [subindo, setSubindo] = useState(false);
 
+  const [incentivoAberto, setIncentivoAberto] = useState(false);
+  const [produtosCatalogo, setProdutosCatalogo] = useState([]);
+  const [incentivo, setIncentivo] = useState({ descricao: '', itensPermitidos: [] });
+  const [salvandoIncentivo, setSalvandoIncentivo] = useState(false);
+
   const [demoAberto, setDemoAberto] = useState(false);
   const [demoEnviando, setDemoEnviando] = useState(false);
   const [demo, setDemo] = useState({
@@ -87,6 +92,63 @@ export default function Painel() {
   useEffect(() => {
     carregarMidia();
   }, []);
+
+  async function carregarIncentivo() {
+    try {
+      const res = await fetch('/api/campanha-config');
+      const data = await res.json();
+      setProdutosCatalogo(data.produtos || []);
+      if (data.incentivo) {
+        setIncentivo({
+          descricao: data.incentivo.descricao,
+          itensPermitidos: data.incentivo.itens_permitidos || [],
+        });
+      }
+    } catch (e) {
+      /* não bloqueia o resto do painel */
+    }
+  }
+
+  useEffect(() => {
+    carregarIncentivo();
+  }, []);
+
+  function toggleItemIncentivo(nome) {
+    setIncentivo((atual) => {
+      const jaTem = atual.itensPermitidos.includes(nome);
+      const itensPermitidos = jaTem
+        ? atual.itensPermitidos.filter((n) => n !== nome)
+        : [...atual.itensPermitidos, nome];
+      return { ...atual, itensPermitidos };
+    });
+  }
+
+  async function salvarIncentivo() {
+    if (!incentivo.descricao.trim()) {
+      setFeedback({ tipo: 'erro', texto: 'Descreva o incentivo (o texto que o cliente ouve no áudio)' });
+      return;
+    }
+    if (!incentivo.itensPermitidos.length) {
+      setFeedback({ tipo: 'erro', texto: 'Selecione pelo menos 1 item do cardápio' });
+      return;
+    }
+    setSalvandoIncentivo(true);
+    setFeedback(null);
+    try {
+      const res = await fetch('/api/campanha-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(incentivo),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setFeedback({ tipo: 'ok', texto: 'Incentivo atualizado! Vale a partir do próximo disparo.' });
+    } catch (e) {
+      setFeedback({ tipo: 'erro', texto: e.message || 'Erro ao salvar incentivo' });
+    } finally {
+      setSalvandoIncentivo(false);
+    }
+  }
 
   async function subirBuffet(arquivo) {
     if (!arquivo) return;
@@ -245,6 +307,90 @@ export default function Painel() {
             style={{ display: 'none' }}
           />
         </label>
+      </div>
+
+      <div style={{ background: '#fff', borderRadius: 14, padding: 14, marginBottom: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+        <button
+          onClick={() => setIncentivoAberto((v) => !v)}
+          style={{ background: 'none', border: 'none', padding: 0, fontSize: 14, fontWeight: 600, cursor: 'pointer', width: '100%', textAlign: 'left' }}
+        >
+          {incentivoAberto ? '▾' : '▸'} 🎁 Incentivo da campanha
+        </button>
+        {!incentivoAberto && incentivo.itensPermitidos.length > 0 && (
+          <p style={{ fontSize: 12, color: '#71717a', margin: '4px 0 0' }}>
+            Hoje: {incentivo.itensPermitidos.join(' + ')}
+          </p>
+        )}
+
+        {incentivoAberto && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
+            <label style={{ fontSize: 12, color: '#52525b', fontWeight: 600 }}>
+              Texto que o cliente ouve no áudio
+            </label>
+            <textarea
+              value={incentivo.descricao}
+              onChange={(e) => setIncentivo({ ...incentivo, descricao: e.target.value })}
+              placeholder="Ex: 1 coquinha mini de 200ml + 1 sobremesa"
+              rows={2}
+              style={{ padding: 8, borderRadius: 8, border: '1px solid #d4d4d8', fontSize: 13, resize: 'vertical' }}
+            />
+
+            <label style={{ fontSize: 12, color: '#52525b', fontWeight: 600, marginTop: 4 }}>
+              Itens que o cliente realmente recebe (trava o que o atendimento pode entregar)
+            </label>
+            <div style={{ maxHeight: 220, overflowY: 'auto', border: '1px solid #e4e4e7', borderRadius: 8, padding: 6 }}>
+              {produtosCatalogo.length === 0 && (
+                <p style={{ fontSize: 12, color: '#a1a1aa', padding: 4 }}>Carregando cardápio...</p>
+              )}
+              {Object.entries(
+                produtosCatalogo.reduce((acc, p) => {
+                  const cat = p.categoria || 'Outros';
+                  (acc[cat] ||= []).push(p);
+                  return acc;
+                }, {})
+              ).map(([categoria, itens]) => (
+                <div key={categoria} style={{ marginBottom: 6 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#a1a1aa', textTransform: 'uppercase', padding: '4px 4px 2px' }}>
+                    {categoria}
+                  </div>
+                  {itens.map((p) => (
+                    <label key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 6px', fontSize: 13, cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={incentivo.itensPermitidos.includes(p.nome)}
+                        onChange={() => toggleItemIncentivo(p.nome)}
+                      />
+                      {p.nome}
+                    </label>
+                  ))}
+                </div>
+              ))}
+            </div>
+
+            {incentivo.itensPermitidos.length > 0 && (
+              <p style={{ fontSize: 12, color: '#166534' }}>
+                Selecionado: {incentivo.itensPermitidos.join(' + ')}
+              </p>
+            )}
+
+            <button
+              onClick={salvarIncentivo}
+              disabled={salvandoIncentivo}
+              style={{
+                padding: '10px 12px',
+                borderRadius: 10,
+                border: 'none',
+                background: '#18181b',
+                color: '#fff',
+                fontWeight: 600,
+                fontSize: 13,
+                opacity: salvandoIncentivo ? 0.6 : 1,
+              }}
+            >
+              {salvandoIncentivo ? 'Salvando...' : '💾 Salvar incentivo'}
+            </button>
+          </div>
+        )}
       </div>
 
       <div style={{ background: '#fff', borderRadius: 14, padding: 14, marginBottom: 16, boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>

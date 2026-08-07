@@ -1,10 +1,12 @@
 import {
   listarLeadsCampanha,
   contarEnviadosHoje,
+  minutosDesdeUltimoEnvio,
   criarCupom,
   registrarOfertaEnviada,
   buscarMidiaDoDia,
   marcarWhatsappInvalido,
+  buscarConfigIncentivo,
 } from '../../../lib/supabase';
 import { enviarMidia, enviarAudio, verificarNumeroWhatsapp } from '../../../lib/evolution';
 import { gerarMensagemPrimeiraCompra } from '../../../lib/openai';
@@ -16,14 +18,6 @@ import { deveDispararAgora, agoraNoFuso, META_DIARIA } from '../../../lib/campan
 // frequência do cron, não de lote.
 export const maxDuration = 60;
 
-// Texto que o cliente ouve. O volume da sobremesa fica de fora de propósito:
-// "75ml" soa pequeno e tira o apelo do brinde.
-const BRINDE = '1 coquinha mini de 200ml (ou outro refrigerante mini) + 1 sobremesa';
-
-// Nomes EXATOS do cardápio que podem sair como cortesia. É esta lista, e não
-// o texto acima, que o atendimento usa pra decidir o que entregar — sem ela
-// um pedido de "refrigerante" casaria com a Coca de 2L.
-const BRINDE_ITENS_PERMITIDOS = ['Refrigerante 200ml Pet', 'Sobremesa 75ml'];
 const CANDIDATOS_POR_TICK = 8;
 
 // Falha fechado de propósito: esta rota está fora da senha do painel (o
@@ -63,11 +57,14 @@ async function executar(request) {
     const { hora, minuto } = agoraNoFuso(agora);
     const relogio = `${String(hora).padStart(2, '0')}:${String(minuto).padStart(2, '0')}`;
 
-    const enviadosHoje = await contarEnviadosHoje('brinde');
+    const [enviadosHoje, minutosDesdeUltimo] = await Promise.all([
+      contarEnviadosHoje('brinde'),
+      minutosDesdeUltimoEnvio('brinde'),
+    ]);
 
     const decisao = forcar
       ? { disparar: true, motivo: 'forcado_manualmente' }
-      : deveDispararAgora({ enviadosHoje, agora });
+      : deveDispararAgora({ enviadosHoje, agora, minutosDesdeUltimoEnvio: minutosDesdeUltimo });
 
     if (!decisao.disparar) {
       return Response.json({ disparou: false, motivo: decisao.motivo, enviadosHoje, meta: META_DIARIA, relogio });
@@ -117,18 +114,23 @@ async function executar(request) {
       });
     }
 
+    const incentivo = await buscarConfigIncentivo();
+    if (!incentivo) {
+      return Response.json({ disparou: false, motivo: 'incentivo_nao_configurado' }, { status: 500 });
+    }
+
     const cupom = await criarCupom({
       clienteId: lead.id,
       tipo: 'brinde',
       descontoPercentual: 0,
-      descricao: BRINDE,
-      itensPermitidos: BRINDE_ITENS_PERMITIDOS,
+      descricao: incentivo.descricao,
+      itensPermitidos: incentivo.itens_permitidos,
       validoAteDias: 7,
     });
 
     const { audio: textoAudio, cta: textoCta } = await gerarMensagemPrimeiraCompra({
       cliente: lead,
-      brinde: BRINDE,
+      brinde: incentivo.descricao,
       cupom,
     });
 
