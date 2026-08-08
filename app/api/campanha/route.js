@@ -128,10 +128,21 @@ async function executar(request) {
       validoAteDias: 7,
     });
 
+    // A copy muda pela relação real com a casa — mandar "nunca comprou aqui"
+    // pra quem tem a tag ja_comprou seria factualmente errado, não só um
+    // detalhe de tom. ja_comprou tem prioridade sobre interessado se a pessoa
+    // tiver as duas por algum motivo.
+    const segmento = lead.tags?.includes('ja_comprou')
+      ? 'cliente'
+      : lead.tags?.includes('interessado')
+        ? 'interessado'
+        : 'frio';
+
     const { audio: textoAudio, cta: textoCta } = await gerarMensagemPrimeiraCompra({
       cliente: lead,
       brinde: incentivo.descricao,
       cupom,
+      segmento,
     });
 
     // Áudio primeiro, mídia depois — é a ordem que soa como pessoa mandando
@@ -165,7 +176,7 @@ async function executar(request) {
       disparou: true,
       motivo: decisao.motivo,
       relogio,
-      lead: { nome: lead.nome, telefone: lead.telefone },
+      lead: { nome: lead.nome, telefone: lead.telefone, segmento },
       cupom: cupom.codigo,
       enviadosHoje: enviadosHoje + 1,
       meta: META_DIARIA,
