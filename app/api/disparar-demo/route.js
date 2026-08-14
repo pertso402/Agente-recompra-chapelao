@@ -1,4 +1,4 @@
-import { buscarOuCriarClienteDemo, criarCupom, registrarOfertaEnviada } from '../../../lib/supabase';
+import { buscarOuCriarClienteDemo, criarCupom, registrarOfertaEnviada } from '../../../lib/supabase-demo';
 import { enviarMidia, enviarTexto, enviarAudio, verificarNumeroWhatsapp } from '../../../lib/evolution';
 import { gerarMensagemRecompra } from '../../../lib/openai';
 import { gerarAudioBase64 } from '../../../lib/elevenlabs';
