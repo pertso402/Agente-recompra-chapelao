@@ -2,10 +2,14 @@
 
 import { useState } from 'react';
 
+// videoUrl fica vazio até você colar o link de cada vídeo aqui — depois disso,
+// escolher o nicho já preenche o vídeo certo automaticamente (dá pra sobrescrever
+// manualmente no campo abaixo, se precisar de outro vídeo pontual).
 const NICHOS = {
-  marmitaria: { label: 'Marmitaria', produtoExemplo: 'Marmitex de Frango' },
-  pizzaria: { label: 'Pizzaria', produtoExemplo: 'Pizza de Calabresa' },
-  hamburgueria: { label: 'Hamburgueria', produtoExemplo: 'X-Bacon Artesanal' },
+  marmitaria: { label: 'Marmitaria', produtoExemplo: 'Marmitex de Frango', videoUrl: '' },
+  restaurante: { label: 'Restaurante (buffet)', produtoExemplo: 'Buffet do dia', videoUrl: '' },
+  pizzaria: { label: 'Pizzaria', produtoExemplo: 'Pizza de Calabresa', videoUrl: '' },
+  hamburgueria: { label: 'Hamburgueria', produtoExemplo: 'X-Bacon Artesanal', videoUrl: '' },
 };
 
 export default function Demo() {
@@ -16,7 +20,7 @@ export default function Demo() {
     nome: '',
     nicho: 'pizzaria',
     nomeProduto: NICHOS.pizzaria.produtoExemplo,
-    mediaUrl: '',
+    mediaUrl: NICHOS.pizzaria.videoUrl,
     tipoMidia: 'video',
   });
 
@@ -84,7 +88,12 @@ export default function Demo() {
           />
           <select
             value={demo.nicho}
-            onChange={(e) => setDemo({ ...demo, nicho: e.target.value, nomeProduto: NICHOS[e.target.value].produtoExemplo })}
+            onChange={(e) => setDemo({
+              ...demo,
+              nicho: e.target.value,
+              nomeProduto: NICHOS[e.target.value].produtoExemplo,
+              mediaUrl: NICHOS[e.target.value].videoUrl,
+            })}
             style={{ padding: 8, borderRadius: 8, border: '1px solid #d4d4d8', fontSize: 13 }}
           >
             {Object.entries(NICHOS).map(([key, v]) => (
