@@ -8,8 +8,8 @@ import { useState } from 'react';
 const NICHOS = {
   marmitaria: { label: 'Marmitaria', produtoExemplo: 'Marmitex de Frango', videoUrl: '' },
   restaurante: { label: 'Restaurante (buffet)', produtoExemplo: 'Buffet do dia', videoUrl: '' },
-  pizzaria: { label: 'Pizzaria', produtoExemplo: 'Pizza de Calabresa', videoUrl: '' },
-  hamburgueria: { label: 'Hamburgueria', produtoExemplo: 'X-Bacon Artesanal', videoUrl: '' },
+  pizzaria: { label: 'Pizzaria', produtoExemplo: 'Pizza de Calabresa', videoUrl: 'https://mhonpvgdklrapcdfovmv.supabase.co/storage/v1/object/public/video%20burguer/food%20porn.mp4' },
+  hamburgueria: { label: 'Hamburgueria', produtoExemplo: 'X-Bacon Artesanal', videoUrl: 'https://mhonpvgdklrapcdfovmv.supabase.co/storage/v1/object/public/video%20burguer/food%20porn.mp4' },
 };
 
 export default function Demo() {
