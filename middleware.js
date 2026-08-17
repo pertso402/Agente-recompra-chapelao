@@ -1,6 +1,16 @@
 import { NextResponse } from 'next/server';
 
+// A demo de prospecção fica fora da senha: ela é aberta na frente do lead,
+// normalmente no celular, e parar pra digitar senha mata o efeito dos "30
+// segundos". Pode ser pública porque a /demo não lê o banco — todo dado que
+// ela usa é digitado na hora, então não há cliente real exposto ali.
+// Comparação exata de propósito: um prefixo solto liberaria /demografia,
+// /demo-interno e qualquer rota futura que comece com "demo".
+const ROTAS_PUBLICAS = ['/demo', '/api/disparar-demo'];
+
 export function middleware(request) {
+  if (ROTAS_PUBLICAS.includes(request.nextUrl.pathname)) return NextResponse.next();
+
   const senha = process.env.PANEL_PASSWORD;
   if (!senha) return NextResponse.next();
 
