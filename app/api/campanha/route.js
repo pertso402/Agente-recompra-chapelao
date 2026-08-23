@@ -70,15 +70,16 @@ async function executar(request) {
       return Response.json({ disparou: false, motivo: decisao.motivo, enviadosHoje, meta: META_DIARIA, relogio });
     }
 
-    // A campanha é "vídeo do buffet de hoje + áudio". Sem o vídeo do dia ela
-    // perde o que a torna crível, então não dispara pela metade — melhor não
-    // enviar e sinalizar no painel do que mandar uma oferta sem a comida real.
+    // A campanha é "vídeo real da marmita + áudio". buscarMidiaDoDia() cai no
+    // vídeo padrão sozinha quando ninguém subiu um vídeo específico pra hoje —
+    // então isto só dispara se nem o padrão estiver configurado (praticamente
+    // nunca deveria acontecer).
     const midia = await buscarMidiaDoDia();
     if (!midia) {
       return Response.json({
         disparou: false,
-        motivo: 'sem_midia_do_dia',
-        aviso: 'Nenhum vídeo do buffet foi enviado hoje. Suba o vídeo no painel para a campanha rodar.',
+        motivo: 'sem_midia_configurada',
+        aviso: 'Nenhum vídeo do dia nem vídeo padrão configurado. Suba um vídeo no painel para a campanha rodar.',
         enviadosHoje,
         meta: META_DIARIA,
         relogio,
