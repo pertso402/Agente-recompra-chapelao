@@ -130,10 +130,17 @@ async function executar(request) {
     });
 
     // A copy muda pela relação real com a casa — mandar "nunca comprou aqui"
-    // pra quem tem a tag ja_comprou seria factualmente errado, não só um
-    // detalhe de tom. ja_comprou tem prioridade sobre interessado se a pessoa
-    // tiver as duas por algum motivo.
-    const segmento = lead.tags?.includes('ja_comprou')
+    // pra quem já é cliente seria factualmente errado, não só um detalhe de tom.
+    //
+    // São duas famílias de tag convivendo, e olhar só pra uma delas é o bug que
+    // isso corrige: `ja_comprou` vem de importação manual, enquanto
+    // `cliente`/`cliente_fiel` são mantidas por trigger a partir de
+    // total_pedidos — ou seja, são as que de fato provam pedido no sistema.
+    // Considerar só `ja_comprou` classificava como "frio" 47 clientes reais,
+    // todos com pedido registrado, que receberiam um convite pra "conhecer
+    // pela primeira vez" a casa onde já compraram.
+    const TAGS_CLIENTE = ['ja_comprou', 'cliente', 'cliente_fiel'];
+    const segmento = TAGS_CLIENTE.some((t) => lead.tags?.includes(t))
       ? 'cliente'
       : lead.tags?.includes('interessado')
         ? 'interessado'
