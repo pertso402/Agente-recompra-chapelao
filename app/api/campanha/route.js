@@ -120,13 +120,22 @@ async function executar(request) {
       return Response.json({ disparou: false, motivo: 'incentivo_nao_configurado' }, { status: 500 });
     }
 
+    // Sequência de recompra: 0 = oferta inicial, 1 = lembrete, 2 = última tentativa.
+    // A validade do cupom é o que define o espaçamento real entre etapas — ela some
+    // da lista de elegíveis (campanha_selecionar_leads) enquanto o cupom da etapa
+    // anterior ainda estiver válido e não usado, e só reaparece quando ele expira.
+    // Última etapa com validade mais curta: gera urgência real, não só na copy.
+    const etapa = lead.etapa_sequencia ?? 0;
+    const validoAteDiasPorEtapa = { 0: 7, 1: 7, 2: 4 };
+    const validoAteDias = validoAteDiasPorEtapa[etapa] ?? 7;
+
     const cupom = await criarCupom({
       clienteId: lead.id,
       tipo: 'brinde',
       descontoPercentual: 0,
       descricao: incentivo.descricao,
       itensPermitidos: incentivo.itens_permitidos,
-      validoAteDias: 7,
+      validoAteDias,
     });
 
     // A copy muda pela relação real com a casa — mandar "nunca comprou aqui"
@@ -151,6 +160,7 @@ async function executar(request) {
       brinde: incentivo.descricao,
       cupom,
       segmento,
+      etapa,
     });
 
     // Áudio primeiro, mídia depois — é a ordem que soa como pessoa mandando
@@ -178,13 +188,14 @@ async function executar(request) {
       mensagemVideo: midia.video_url,
       mensagemAudio: audioEnviado ? textoAudio : null,
       mensagemCta: textoCta,
+      etapaSequencia: etapa,
     });
 
     return Response.json({
       disparou: true,
       motivo: decisao.motivo,
       relogio,
-      lead: { nome: lead.nome, telefone: lead.telefone, segmento },
+      lead: { nome: lead.nome, telefone: lead.telefone, segmento, etapa },
       cupom: cupom.codigo,
       enviadosHoje: enviadosHoje + 1,
       meta: META_DIARIA,
