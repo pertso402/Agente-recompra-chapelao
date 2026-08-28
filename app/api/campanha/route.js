@@ -8,13 +8,12 @@ import {
   marcarWhatsappInvalido,
   buscarConfigIncentivo,
 } from '../../../lib/supabase';
-import { enviarMidia, enviarAudio, verificarNumeroWhatsapp } from '../../../lib/evolution';
+import { enviarMidia, verificarNumeroWhatsapp } from '../../../lib/evolution';
 import { gerarMensagemPrimeiraCompra } from '../../../lib/openai';
-import { gerarAudioBase64 } from '../../../lib/elevenlabs';
 import { deveDispararAgora, agoraNoFuso, META_DIARIA } from '../../../lib/campanha';
 
-// Um disparo leva ~25s (OpenAI + ElevenLabs + 2 envios). O teto do plano é 60s,
-// por isso este endpoint manda no máximo UM por chamada — o ritmo vem da
+// Um disparo leva ~10s (OpenAI + 1 envio). O teto do plano é 60s, mas este
+// endpoint manda no máximo UM por chamada mesmo assim — o ritmo vem da
 // frequência do cron, não de lote.
 export const maxDuration = 60;
 
@@ -70,7 +69,7 @@ async function executar(request) {
       return Response.json({ disparou: false, motivo: decisao.motivo, enviadosHoje, meta: META_DIARIA, relogio });
     }
 
-    // A campanha é "vídeo real da marmita + áudio". buscarMidiaDoDia() cai no
+    // A campanha é "vídeo real da marmita + texto". buscarMidiaDoDia() cai no
     // vídeo padrão sozinha quando ninguém subiu um vídeo específico pra hoje —
     // então isto só dispara se nem o padrão estiver configurado (praticamente
     // nunca deveria acontecer).
@@ -155,7 +154,7 @@ async function executar(request) {
         ? 'interessado'
         : 'frio';
 
-    const { audio: textoAudio, cta: textoCta } = await gerarMensagemPrimeiraCompra({
+    const { mensagem } = await gerarMensagemPrimeiraCompra({
       cliente: lead,
       brinde: incentivo.descricao,
       cupom,
@@ -163,19 +162,14 @@ async function executar(request) {
       etapa,
     });
 
-    // Áudio primeiro, mídia depois — é a ordem que soa como pessoa mandando
-    // mensagem: fala e em seguida mostra a comida.
-    let audioEnviado = false;
-    const audioBase64 = await gerarAudioBase64(textoAudio);
-    if (audioBase64) {
-      await enviarAudio(lead.telefone, audioBase64);
-      audioEnviado = true;
-    }
-
+    // Um envio só: vídeo com a mensagem inteira como legenda. A campanha
+    // mandava áudio antes da mídia, mas o áudio não mudou resultado nenhum e
+    // custava crédito de ElevenLabs a cada disparo — agora o texto carrega
+    // sozinho o que a fala carregava.
     await enviarMidia(lead.telefone, {
       url: midia.video_url,
       tipo: midia.tipo,
-      legenda: textoCta,
+      legenda: mensagem,
     });
 
     const oferta = await registrarOfertaEnviada({
@@ -186,8 +180,8 @@ async function executar(request) {
       cupomId: cupom.id,
       cupomCodigo: cupom.codigo,
       mensagemVideo: midia.video_url,
-      mensagemAudio: audioEnviado ? textoAudio : null,
-      mensagemCta: textoCta,
+      mensagemAudio: null,
+      mensagemCta: mensagem,
       etapaSequencia: etapa,
     });
 
