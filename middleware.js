@@ -32,5 +32,6 @@ export function middleware(request) {
 // Essas rotas se protegem sozinhas com CRON_SECRET, exigido de forma estrita
 // dentro de cada uma.
 export const config = {
-  matcher: '/((?!_next/static|_next/image|favicon.ico|api/campanha|api/notificar-status).*)',
+  matcher:
+    '/((?!_next/static|_next/image|favicon.ico|api/campanha|api/notificar-status|api/status-mensagens).*)',
 };

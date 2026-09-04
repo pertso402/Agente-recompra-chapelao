@@ -166,11 +166,15 @@ async function executar(request) {
     // mandava áudio antes da mídia, mas o áudio não mudou resultado nenhum e
     // custava crédito de ElevenLabs a cada disparo — agora o texto carrega
     // sozinho o que a fala carregava.
-    await enviarMidia(lead.telefone, {
+    const envio = await enviarMidia(lead.telefone, {
       url: midia.video_url,
       tipo: midia.tipo,
       legenda: mensagem,
     });
+
+    // Guardar o id da mensagem é o que permite perguntar depois se ela foi
+    // entregue e lida. Sem ele, "enviada" é tudo que se sabe pra sempre.
+    const whatsappMessageId = envio?.key?.id || null;
 
     const oferta = await registrarOfertaEnviada({
       clienteId: lead.id,
@@ -183,6 +187,7 @@ async function executar(request) {
       mensagemAudio: null,
       mensagemCta: mensagem,
       etapaSequencia: etapa,
+      whatsappMessageId,
     });
 
     return Response.json({
