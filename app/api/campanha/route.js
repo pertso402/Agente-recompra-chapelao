@@ -8,8 +8,9 @@ import {
   marcarWhatsappInvalido,
   buscarConfigIncentivo,
 } from '../../../lib/supabase';
-import { enviarMidia, verificarNumeroWhatsapp } from '../../../lib/evolution';
+import { enviarMidia, enviarTexto, verificarNumeroWhatsapp } from '../../../lib/evolution';
 import { gerarMensagemPrimeiraCompra } from '../../../lib/openai';
+import { montarConvite } from '../../../lib/roleta';
 import { deveDispararAgora, agoraNoFuso, META_DIARIA } from '../../../lib/campanha';
 
 // Um disparo leva ~10s (OpenAI + 1 envio). O teto do plano é 60s, mas este
@@ -56,9 +57,14 @@ async function executar(request) {
     const { hora, minuto } = agoraNoFuso(agora);
     const relogio = `${String(hora).padStart(2, '0')}:${String(minuto).padStart(2, '0')}`;
 
+    // 'roleta' = convite em texto -> resposta -> link (o teste atual).
+    // 'video'  = disparo antigo de video + legenda. Trocavel pelo banco, sem deploy.
+    const modo = await buscarModoCampanha();
+    const tipoOferta = modo === 'roleta' ? 'roleta' : 'brinde';
+
     const [enviadosHoje, minutosDesdeUltimo] = await Promise.all([
-      contarEnviadosHoje('brinde'),
-      minutosDesdeUltimoEnvio('brinde'),
+      contarEnviadosHoje(tipoOferta),
+      minutosDesdeUltimoEnvio(tipoOferta),
     ]);
 
     const decisao = forcar
@@ -69,12 +75,14 @@ async function executar(request) {
       return Response.json({ disparou: false, motivo: decisao.motivo, enviadosHoje, meta: META_DIARIA, relogio });
     }
 
+    // Só o modo vídeo depende de mídia. No modo roleta a primeira mensagem é
+    // texto puro, então exigir vídeo aqui pararia a campanha sem motivo.
     // A campanha é "vídeo real da marmita + texto". buscarMidiaDoDia() cai no
     // vídeo padrão sozinha quando ninguém subiu um vídeo específico pra hoje —
     // então isto só dispara se nem o padrão estiver configurado (praticamente
     // nunca deveria acontecer).
-    const midia = await buscarMidiaDoDia();
-    if (!midia) {
+    const midia = modo === 'video' ? await buscarMidiaDoDia() : null;
+    if (modo === 'video' && !midia) {
       return Response.json({
         disparou: false,
         motivo: 'sem_midia_configurada',
@@ -85,7 +93,7 @@ async function executar(request) {
       });
     }
 
-    const candidatos = await listarLeadsCampanha({ limite: CANDIDATOS_POR_TICK, tipoOferta: 'brinde', tags });
+    const candidatos = await listarLeadsCampanha({ limite: CANDIDATOS_POR_TICK, tipoOferta, tags });
     if (!candidatos.length) {
       return Response.json({ disparou: false, motivo: 'sem_leads_elegiveis', tags, enviadosHoje, relogio });
     }
@@ -114,6 +122,51 @@ async function executar(request) {
       });
     }
 
+    // Etapa da sequência (0 = convite, 1 = lembrete, 2 = última tentativa).
+    // Vem da mesma RPC que já governa a sequência do modo vídeo.
+    const etapa = lead.etapa_sequencia ?? 0;
+
+    // ── MODO ROLETA ────────────────────────────────────────────────────────
+    // Só a PERGUNTA sai agora. O link da roleta é mandado pelo webhook, quando
+    // e se a pessoa responder — é a resposta que abre a janela de conversa e
+    // tira a segunda mensagem da categoria de disparo frio.
+    //
+    // Nenhum cupom é criado aqui: o prêmio só existe depois que ela gira. Criar
+    // cupom no disparo daria brinde a quem nunca abriu o link.
+    if (modo === 'roleta') {
+      const convite = montarConvite(lead.nome);
+      const envioConvite = await enviarTexto(lead.telefone, convite);
+
+      // Mesmo id que /api/status-mensagens usa pra ler o ACK. Sem guardá-lo, o
+      // convite sairia de fora da medição de entrega/leitura — que é o primeiro
+      // degrau do funil e o que diz se o problema é entregabilidade ou oferta.
+      const waIdConvite = envioConvite?.key?.id || null;
+
+      const oferta = await registrarOfertaEnviada({
+        clienteId: lead.id,
+        diasSemComprar: 0,
+        tipoOferta: 'roleta',
+        descontoPercentual: 0,
+        mensagemCta: convite,
+        etapaSequencia: etapa,
+        whatsappMessageId: waIdConvite,
+      });
+
+      return Response.json({
+        disparou: true,
+        modo,
+        motivo: decisao.motivo,
+        relogio,
+        lead: { nome: lead.nome, telefone: lead.telefone, etapa },
+        aguardando: 'resposta_do_lead',
+        enviadosHoje: enviadosHoje + 1,
+        meta: META_DIARIA,
+        numerosInvalidos: invalidos,
+        oferta: oferta.id,
+      });
+    }
+
+    // ── MODO VÍDEO (fluxo antigo) ──────────────────────────────────────────
     const incentivo = await buscarConfigIncentivo();
     if (!incentivo) {
       return Response.json({ disparou: false, motivo: 'incentivo_nao_configurado' }, { status: 500 });
@@ -124,7 +177,6 @@ async function executar(request) {
     // da lista de elegíveis (campanha_selecionar_leads) enquanto o cupom da etapa
     // anterior ainda estiver válido e não usado, e só reaparece quando ele expira.
     // Última etapa com validade mais curta: gera urgência real, não só na copy.
-    const etapa = lead.etapa_sequencia ?? 0;
     const validoAteDiasPorEtapa = { 0: 7, 1: 7, 2: 4 };
     const validoAteDias = validoAteDiasPorEtapa[etapa] ?? 7;
 

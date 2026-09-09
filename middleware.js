@@ -27,11 +27,13 @@ export function middleware(request) {
   });
 }
 
-// /api/campanha e /api/notificar-status ficam fora da senha do painel porque
-// quem chama é o banco (pg_cron/pg_net), que não faz login de navegador.
+// /api/campanha, /api/notificar-status, /api/status-mensagens e
+// /api/webhook-recompra ficam fora da senha do painel porque quem chama é
+// máquina — o banco (pg_cron/pg_net) ou o Evolution —, e nenhuma delas faz
+// login de navegador.
 // Essas rotas se protegem sozinhas com CRON_SECRET, exigido de forma estrita
 // dentro de cada uma.
 export const config = {
   matcher:
-    '/((?!_next/static|_next/image|favicon.ico|api/campanha|api/notificar-status|api/status-mensagens).*)',
+    '/((?!_next/static|_next/image|favicon.ico|api/campanha|api/notificar-status|api/status-mensagens|api/webhook-recompra).*)',
 };
