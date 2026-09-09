@@ -134,6 +134,20 @@ async function executar(request) {
     // Nenhum cupom é criado aqui: o prêmio só existe depois que ela gira. Criar
     // cupom no disparo daria brinde a quem nunca abriu o link.
     if (modo === 'roleta') {
+      // Checa ANTES de perguntar. Sem ROLETA_URL o link falharia só na hora da
+      // resposta, e a pessoa ficaria com uma pergunta no ar e nenhuma resposta —
+      // pior do que não ter perguntado.
+      if (!process.env.ROLETA_URL) {
+        return Response.json({
+          disparou: false,
+          motivo: 'roleta_url_nao_configurada',
+          aviso: 'Configure ROLETA_URL nas variáveis de ambiente. Sem ela o convite sai e o link não.',
+          enviadosHoje,
+          meta: META_DIARIA,
+          relogio,
+        }, { status: 500 });
+      }
+
       const convite = montarConvite(lead.nome);
       const envioConvite = await enviarTexto(lead.telefone, convite);
 
