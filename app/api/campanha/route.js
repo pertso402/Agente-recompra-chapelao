@@ -7,6 +7,8 @@ import {
   buscarMidiaDoDia,
   marcarWhatsappInvalido,
   buscarConfigIncentivo,
+  buscarModoCampanha,
+  buscarContextoDoDia,
 } from '../../../lib/supabase';
 import { enviarMidia, enviarTexto, verificarNumeroWhatsapp } from '../../../lib/evolution';
 import { gerarMensagemPrimeiraCompra } from '../../../lib/openai';
@@ -220,12 +222,18 @@ async function executar(request) {
         ? 'interessado'
         : 'frio';
 
+    // Clima/acontecimento do dia, editável no banco. É o que faz a mensagem
+    // soar escrita hoje em vez de gerada em série — e num dia de chuva e frio
+    // empurra justamente a decisão que a campanha quer: não sair pra comer fora.
+    const contextoDoDia = await buscarContextoDoDia();
+
     const { mensagem } = await gerarMensagemPrimeiraCompra({
       cliente: lead,
       brinde: incentivo.descricao,
       cupom,
       segmento,
       etapa,
+      contextoDoDia,
     });
 
     // Um envio só: vídeo com a mensagem inteira como legenda. A campanha
@@ -262,6 +270,10 @@ async function executar(request) {
       relogio,
       lead: { nome: lead.nome, telefone: lead.telefone, segmento, etapa },
       cupom: cupom.codigo,
+      // Sem isso não dá pra saber, olhando o log, se a copy usou o contexto do
+      // dia ou se ele estava vencido/vazio e a mensagem saiu genérica.
+      contextoDoDia: contextoDoDia || null,
+      video: midia.video_url,
       enviadosHoje: enviadosHoje + 1,
       meta: META_DIARIA,
       numerosInvalidos: invalidos,
