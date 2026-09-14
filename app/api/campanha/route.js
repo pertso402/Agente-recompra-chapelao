@@ -9,6 +9,7 @@ import {
   buscarConfigIncentivo,
   buscarModoCampanha,
   buscarContextoDoDia,
+  removerCupom,
 } from '../../../lib/supabase';
 import { enviarMidia, enviarTexto, verificarNumeroWhatsapp } from '../../../lib/evolution';
 import { gerarMensagemPrimeiraCompra } from '../../../lib/openai';
@@ -79,16 +80,14 @@ async function executar(request) {
 
     // Só o modo vídeo depende de mídia. No modo roleta a primeira mensagem é
     // texto puro, então exigir vídeo aqui pararia a campanha sem motivo.
-    // A campanha é "vídeo real da marmita + texto". buscarMidiaDoDia() cai no
-    // vídeo padrão sozinha quando ninguém subiu um vídeo específico pra hoje —
-    // então isto só dispara se nem o padrão estiver configurado (praticamente
-    // nunca deveria acontecer).
+    // A campanha vende a marmita DE HOJE, então exige o vídeo do dia — sem
+    // fallback pra vídeo genérico, que entrega que é disparo automático.
     const midia = modo === 'video' ? await buscarMidiaDoDia() : null;
     if (modo === 'video' && !midia) {
       return Response.json({
         disparou: false,
-        motivo: 'sem_midia_configurada',
-        aviso: 'Nenhum vídeo do dia nem vídeo padrão configurado. Suba um vídeo no painel para a campanha rodar.',
+        motivo: 'sem_midia_do_dia',
+        aviso: 'Nenhum vídeo enviado hoje. Suba o vídeo da marmita de hoje no painel para a campanha rodar.',
         enviadosHoje,
         meta: META_DIARIA,
         relogio,
@@ -227,24 +226,35 @@ async function executar(request) {
     // empurra justamente a decisão que a campanha quer: não sair pra comer fora.
     const contextoDoDia = await buscarContextoDoDia();
 
-    const { mensagem } = await gerarMensagemPrimeiraCompra({
-      cliente: lead,
-      brinde: incentivo.descricao,
-      cupom,
-      segmento,
-      etapa,
-      contextoDoDia,
-    });
+    // O cupom já existe neste ponto porque o código dele entra no texto. Se a
+    // copy ou o envio falharem, ele precisa sair do banco: um cupom válido e
+    // não usado exclui o lead da seleção por 7 dias, então cada falha tirava
+    // da fila alguém que nunca recebeu mensagem nenhuma.
+    let mensagem;
+    let envio;
+    try {
+      ({ mensagem } = await gerarMensagemPrimeiraCompra({
+        cliente: lead,
+        brinde: incentivo.descricao,
+        cupom,
+        segmento,
+        etapa,
+        contextoDoDia,
+      }));
 
-    // Um envio só: vídeo com a mensagem inteira como legenda. A campanha
-    // mandava áudio antes da mídia, mas o áudio não mudou resultado nenhum e
-    // custava crédito de ElevenLabs a cada disparo — agora o texto carrega
-    // sozinho o que a fala carregava.
-    const envio = await enviarMidia(lead.telefone, {
-      url: midia.video_url,
-      tipo: midia.tipo,
-      legenda: mensagem,
-    });
+      // Um envio só: vídeo com a mensagem inteira como legenda. A campanha
+      // mandava áudio antes da mídia, mas o áudio não mudou resultado nenhum e
+      // custava crédito de ElevenLabs a cada disparo — agora o texto carrega
+      // sozinho o que a fala carregava.
+      envio = await enviarMidia(lead.telefone, {
+        url: midia.video_url,
+        tipo: midia.tipo,
+        legenda: mensagem,
+      });
+    } catch (err) {
+      await removerCupom(cupom.id);
+      throw err;
+    }
 
     // Guardar o id da mensagem é o que permite perguntar depois se ela foi
     // entregue e lida. Sem ele, "enviada" é tudo que se sabe pra sempre.
