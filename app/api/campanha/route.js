@@ -252,7 +252,15 @@ async function executar(request) {
         legenda: mensagem,
       });
     } catch (err) {
-      await removerCupom(cupom.id);
+      // A limpeza não pode substituir o erro original: se ela própria falhar
+      // (o cupom pode estar referenciado por roleta_resgates, por exemplo), o
+      // que chega no log seria a falha da limpeza e não a causa do disparo ter
+      // quebrado — que é justamente o que se quer diagnosticar.
+      try {
+        await removerCupom(cupom.id);
+      } catch (erroLimpeza) {
+        console.error('Falha ao remover cupom órfão', cupom.codigo, erroLimpeza);
+      }
       throw err;
     }
 
