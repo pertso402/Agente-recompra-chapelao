@@ -1,6 +1,6 @@
 import { reivindicarRespostaRoleta, devolverRespostaRoleta } from '../../../lib/supabase';
 import { enviarTexto } from '../../../lib/evolution';
-import { montarLinkRoleta, montarMensagemLink, loteDoMes } from '../../../lib/roleta';
+import { montarLinkRoleta, montarMensagemLink } from '../../../lib/roleta';
 
 export const maxDuration = 30;
 
@@ -77,7 +77,7 @@ export async function POST(request) {
     }
 
     try {
-      const link = montarLinkRoleta(oferta.oferta_id, { lote: loteDoMes() });
+      const link = montarLinkRoleta(oferta.ref_curto);
       await enviarTexto(telefone, montarMensagemLink(link));
     } catch (err) {
       // Devolve a reivindicação: sem isso o lead ficaria marcado como "link
