@@ -33,7 +33,7 @@ async function executar(request) {
     // tempo de pedir. Fora disso o convite chega como lembrete de algo que já
     // fechou — e queima a única bala que este cliente tem (é uma vez por pessoa).
     const hora = horaSaoPaulo();
-    if (!url.searchParams.get('forcar') && (hora < 10 || hora >= 13)) {
+    if (!url.searchParams.get('forcar') && (hora < 9 || hora >= 13)) {
       return Response.json({ disparou: false, motivo: 'fora_da_janela', hora });
     }
 
@@ -53,7 +53,7 @@ async function executar(request) {
     // não de lote — mandar 27 mensagens de uma vez é o padrão que dá ban.
     let lead = null;
     for (const candidato of candidatos) {
-      const check = await verificarNumeroWhatsapp(candidato.telefone, 'principal');
+      const check = await verificarNumeroWhatsapp(candidato.telefone);
       if (check.existe) { lead = { ...candidato, telefone: check.numero }; break; }
     }
     if (!lead) {
@@ -73,10 +73,15 @@ async function executar(request) {
 
     const mensagem = montarMensagemPosCompra(lead, incentivo.descricao);
 
-    // 'principal' NÃO é detalhe: é o número onde ela já pediu e já conversou.
-    // Mandar do chip de disparo jogaria esta mensagem no mesmo balde que teve
-    // 84% de não-abertura — e aqui a pessoa é valiosa demais pra isso.
-    await enviarTexto(lead.telefone, mensagem, 'principal');
+    // Sai do CHIP DE DISPARO, não do número principal. O principal atende todos
+    // os clientes da casa: 20-30 mensagens automáticas por dia saindo dele arrisca
+    // o ban do número que sustenta o negócio inteiro — e esse risco é maior que o
+    // ganho de abertura. O chip existe pra absorver exatamente isso.
+    //
+    // O que compensa a abertura menor aqui é a personalização: esta mensagem cita
+    // o nome e o prato que a pessoa realmente comeu, coisa que o disparo genérico
+    // da campanha não tinha.
+    await enviarTexto(lead.telefone, mensagem);
 
     const oferta = await registrarOfertaEnviada({
       clienteId: lead.id,
