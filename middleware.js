@@ -36,5 +36,5 @@ export function middleware(request) {
 // dentro de cada uma.
 export const config = {
   matcher:
-    '/((?!_next/static|_next/image|favicon.ico|api/campanha|api/notificar-status|api/status-mensagens|api/webhook-recompra|api/pos-primeira-compra).*)',
+    '/((?!_next/static|_next/image|favicon.ico|api/campanha|api/notificar-status|api/status-mensagens|api/webhook-recompra|api/pos-primeira-compra|api/lembrete-premio).*)',
 };
