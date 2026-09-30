@@ -1,12 +1,18 @@
-import { reivindicarRespostaRoleta, devolverRespostaRoleta } from '../../../lib/supabase';
-import { enviarTexto } from '../../../lib/evolution';
-import { montarLinkRoleta, montarMensagemLink } from '../../../lib/roleta';
+import { reivindicarRespostaRoleta, devolverRespostaRoleta, buscarCliente } from '../../../lib/supabase';
+import { enviarOfertaVideo } from '../../../lib/oferta-video';
 
-export const maxDuration = 30;
+// Montar a copy e enviar o vídeo leva mais que os 30s de antes, quando a
+// resposta era só um texto com link pronto.
+export const maxDuration = 60;
 
-// Este é o número de DISPARO, não o de atendimento. Ele existe pra fazer uma
-// pergunta e mandar um link — nada mais. Qualquer outra conversa aqui continua
+// Este é o número de DISPARO, não o de atendimento. Ele existe pra responder
+// quem reagiu a um convite — nada mais. Qualquer outra conversa aqui continua
 // sendo respondida pelo dono, na mão, como sempre foi.
+//
+// Quem responde recebe a OFERTA (vídeo do buffet + legenda com o brinde), não
+// mais o link da roleta. A roleta tinha um funil bonito no meio e vazio no fim:
+// 108 abriram o link, 74 giraram, e só 9 prêmios viraram venda. O vídeo direto
+// converteu 2 a 3 vezes mais no mesmo período.
 //
 // O Evolution não manda header customizado neste webhook (headers: null na
 // config da instância), então o segredo viaja na query string. É o que o
@@ -76,17 +82,29 @@ export async function POST(request) {
       return Response.json({ ok: true, ignorado: 'sem_convite_pendente', telefone });
     }
 
+    let resultado;
     try {
-      const link = montarLinkRoleta(oferta.ref_curto);
-      await enviarTexto(telefone, montarMensagemLink(link));
+      // As tags vêm do cliente, não do RPC — e são elas que decidem o tom da
+      // copy. Sem buscar, todo mundo cairia em "frio" e um cliente antigo
+      // receberia convite pra "conhecer a casa pela primeira vez".
+      const cliente = await buscarCliente(oferta.cliente_id);
+      resultado = await enviarOfertaVideo({ lead: { ...cliente, telefone } });
     } catch (err) {
-      // Devolve a reivindicação: sem isso o lead ficaria marcado como "link
-      // enviado" tendo recebido só a pergunta, e sairia do fluxo em silêncio.
+      // Devolve a reivindicação: sem isso o lead ficaria marcado como atendido
+      // tendo recebido só a pergunta, e sairia do fluxo em silêncio — esperando
+      // para sempre uma resposta que ninguém mais vai mandar.
       await devolverRespostaRoleta(oferta.oferta_id).catch(() => {});
       throw err;
     }
 
-    return Response.json({ ok: true, enviou_link: true, oferta: oferta.oferta_id, nome: oferta.nome });
+    return Response.json({
+      ok: true,
+      enviou_oferta: true,
+      oferta_convite: oferta.oferta_id,
+      oferta_enviada: resultado.oferta.id,
+      cupom: resultado.cupom.codigo,
+      nome: oferta.nome,
+    });
   } catch (err) {
     console.error('Erro no webhook da recompra:', err);
     return Response.json({ ok: false, erro: err.message || 'erro interno' }, { status: 200 });
