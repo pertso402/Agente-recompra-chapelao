@@ -4,7 +4,7 @@ import {
   minutosDesdeUltimoEnvio,
   criarCupom,
   registrarOfertaEnviada,
-  buscarMidiaDoDia,
+  buscarMidiaParaCampanha,
   marcarWhatsappInvalido,
   buscarConfigIncentivo,
   buscarModoCampanha,
@@ -80,14 +80,17 @@ async function executar(request) {
 
     // Só o modo vídeo depende de mídia. No modo roleta a primeira mensagem é
     // texto puro, então exigir vídeo aqui pararia a campanha sem motivo.
-    // A campanha vende a marmita DE HOJE, então exige o vídeo do dia — sem
-    // fallback pra vídeo genérico, que entrega que é disparo automático.
-    const midia = modo === 'video' ? await buscarMidiaDoDia() : null;
+    //
+    // Prefere o vídeo do dia; sem ele, usa o vídeo de produto. A regra antiga
+    // mandava PARAR quando faltasse o vídeo do dia — e isso custou doze dias de
+    // campanha parada, de 19/09 a 01/10, sem ninguém perceber. Só para de vez
+    // se nem o vídeo de produto estiver configurado.
+    const midia = modo === 'video' ? await buscarMidiaParaCampanha() : null;
     if (modo === 'video' && !midia) {
       return Response.json({
         disparou: false,
-        motivo: 'sem_midia_do_dia',
-        aviso: 'Nenhum vídeo enviado hoje. Suba o vídeo da marmita de hoje no painel para a campanha rodar.',
+        motivo: 'sem_midia_configurada',
+        aviso: 'Não há vídeo do dia nem vídeo de produto ativo. Suba um dos dois para a campanha rodar.',
         enviadosHoje,
         meta: META_DIARIA,
         relogio,
